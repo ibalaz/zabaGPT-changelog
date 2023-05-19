@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ZaBa Hackathon demo</title>
+    <style>
+        header {
+            background-color: white;
+            padding: 40px;
+        }
+
+        #logo {
+            max-width: 400px;
+            max-height: 100px;
+            position: absolute;
+            top: 0px;
+            left: 0px;
+        }
+
+        #mr_url {
+            width: 70%;
+            font-weight: bold;
+        }
+        
+        .container {
+            display: flex;
+        }
+
+        .form-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 5px;
+            margin-right: 5px;
+        }
+
+        .bold-label {
+            font-weight: bold;
+        }
+
+        .form-group textarea {
+            width: 95%;
+            height: 70vh;
+            resize: vertical;
+        }
+         
+    </style>
+</head>
+<body>
+    <header>
+        <img id="logo" src="{{ url_for('static', filename='ZaBa.jpg') }}" alt="Logo">
+    </header>
+
+    <form method="POST" action="/process">
+        <label class="bold-label" for="mr_url" font-weight: bold>Please enter the merge request URL here, fow which you want to generate a change log proposal:</label><br>
+        <input type="text" id="mr_url" name="mr_url" required> <button type="submit">Generate change log proposal</button>
+        <br><br>
+        
+    </form>
+    <br>
+    {% if result %} <!-- Result contains multiple Tuples: url, MRChangesStr, projectPathWithNamespace, projectID, MergeRequestID, MRChangesStr --> 
+    <div class="container">
+        <div class="form-group">
+            <label class="bold-label" for="result_diff">Differences for Merge Request {{ result[4] }} of project {{ result[2] }}:</label><br>
+            <textarea id="result_diff" name="result_diff" cols="120">{{ result[1] }}</textarea>
+        </div>
+        <div class="form-group">
+            <label class="bold-label" for="result_clog">Changelog.md proposal by ChatGPT for Merge Request {{ result[4] }}:</label><br>
+            <textarea id="result_clog" name="result_clog" cols="120">{{ result[5] }}</textarea>
+        </div>
+    </div>
+    {% endif %}
+    
+</body>
+</html>
