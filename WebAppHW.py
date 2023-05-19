@@ -1,25 +1,44 @@
 import os
 import requests
 
-from flask import Flask, render_template, request
 
-app = Flask(__name__)
+import sqlite3
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+conn = sqlite3.connect('kv_store.db') # Connect to the SQLite database (it will be created if it doesn't exist)
+cursor = conn.cursor()
+# Create a table named kv_store with key and value columns if it does not exists yet...
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS kv_store(
+        key TEXT UNIQUE,
+        value TEXT
+    );
+''')
+conn.commit() # Commit the changes
+conn.close() # Close the connection
 
-@app.route('/process_mr_url', methods=['POST'])
-def process_mr_url():
-    url = request.form['mr_url']
-    result = process_url(url)  # Call your Python function here
+def putCacheValue(key, value): # A function to insert a key-value pair into the kv_store table...
+    conn = sqlite3.connect('kv_store.db') # Connect to the SQLite database (it will be created if it doesn't exist)
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''INSERT INTO kv_store(key, value) VALUES(?, ?)''', (key, value))
+        conn.commit() # Commit the changes
+        conn.close() # Close the connection
+    except sqlite3.IntegrityError:
+        print(f"Key {key} already exists.")
 
-    return render_template('index.html', result=result)
+def getCacheValue(key): # A function to retrieve a value by key from the kv_store table
+    conn = sqlite3.connect('kv_store.db') # Connect to the SQLite database (it will be created if it doesn't exist)
+    cursor = conn.cursor()
+    cursor.execute('''SELECT value FROM kv_store WHERE key = ?''', (key,))
+    result = cursor.fetchone()
+    conn.close() # Close the connection
+
+    return result[0] if result else None
+
+
+import hashlib
 
 def hashInput(input):
-   #take input and return a SHA256 hask of it...
-   import hashlib
-
    # Create a SHA256 hash object
    sha256Hash = hashlib.sha256()
    
@@ -28,22 +47,49 @@ def hashInput(input):
    
    return sha256Hash.hexdigest() # Get the hexadecimal representation of the hashed value
 
+
+import openai
+openai.api_key = "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" #os.environ.get("OPENAI_API_KEY")
+
 def ChatGPT_CachedAnswer(chatPrompt):
-    import openai
+    ChatGPTModel = "gpt-3.5-turbo"
+    chatPromptHash = hashInput(ChatGPTModel + "|" + chatPrompt)
+    print(f"Hash of {ChatGPTModel}|" + chatPrompt[0:30] + f"... je {chatPromptHash}")
 
-    openai.api_key = "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" #os.environ.get("OPENAI_API_KEY")
+    result = getCacheValue(chatPromptHash)
+    if result is None:
+        response = openai.ChatCompletion.create(
+            model=ChatGPTModel,
+            messages=[
+                {"role": "user", "content": chatPrompt}
+            ]
+        )
+        
+        result = response['choices'][0]['message']['content']
+        putCacheValue(chatPromptHash, result)
+        return result
+    else:
+        return result
 
-    chatPromptHash = hashInput(chatPrompt)
-    print(chatPromptHash)
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "user", "content": chatPrompt}
-        ]
-    )
 
-    return response['choices'][0]['message']['content']
+from flask import Flask, render_template, request
+
+app = Flask(__name__)
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/process_mr_url', methods=['POST'])
+def process_mr_url():
+    url = request.form['mr_url']
+
+    result = process_url(url)  # Call your Python function here
+
+    return render_template('index.html', result=result)
 
 
 def process_url(url):
@@ -138,4 +184,4 @@ def process_url(url):
     
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
