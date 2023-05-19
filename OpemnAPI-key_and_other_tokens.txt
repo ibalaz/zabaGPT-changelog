@@ -1,0 +1,7 @@
+Secret key for hackaton: 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
+
+Mislavov SK: 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
+
+DanBi_Personal Organization ID: org-PFhdmgWqRHxLTnBIeJXoZu9z
+
+GitLab access token: glpat-aHvrnFvQUCbQym2_7ayM
