@@ -6,16 +6,45 @@ from flask import Flask, render_template, request
 app = Flask(__name__)
 
 @app.route('/')
-
 def index():
     return render_template('index.html')
 
-@app.route('/process', methods=['POST'])
-def process():
+@app.route('/process_mr_url', methods=['POST'])
+def process_mr_url():
     url = request.form['mr_url']
     result = process_url(url)  # Call your Python function here
 
     return render_template('index.html', result=result)
+
+def hashInput(input):
+   #take input and return a SHA256 hask of it...
+   import hashlib
+
+   # Create a SHA256 hash object
+   sha256Hash = hashlib.sha256()
+   
+   # Update the hash object with the string to be hashed
+   sha256Hash.update(input.encode('utf-8'))
+   
+   return sha256Hash.hexdigest() # Get the hexadecimal representation of the hashed value
+
+def ChatGPT_CachedAnswer(chatPrompt):
+    import openai
+
+    openai.api_key = "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" #os.environ.get("OPENAI_API_KEY")
+
+    chatPromptHash = hashInput(chatPrompt)
+    print(chatPromptHash)
+
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "user", "content": chatPrompt}
+        ]
+    )
+
+    return response['choices'][0]['message']['content']
+
 
 def process_url(url):
     # take URL and extract MR ID from it, then call GitLab API...
@@ -75,7 +104,6 @@ def process_url(url):
             diff = change["diff"]
             #print(f"Diff for {new_path}:\n{diff}")
             diffLength = str(len(diff))
-            MRChangesStr = MRChangesStr + f">>>>>>>>>>    DIFFERENCES FOR {new_path} ({diffLength})     <<<<<<<<<<\n\n{diff}\n\n\n"
 
             if len(diff) > 3000:
                 lines = diff.splitlines()
@@ -83,47 +111,23 @@ def process_url(url):
 
                 diff4cl = ""
                 for line in filtered_lines:
-                    diff4cl = diff4cl + f"{line}\n"
+                    lineWithoutMinus = line[1:]
+                    diff4cl = diff4cl + f"{lineWithoutMinus}\n"
 
                 cl4diff = diff4cl[0:3000]
             else:
                 cl4diff = diff
             
+            cl4diffLength = str(len(cl4diff))
+            MRChangesStr = MRChangesStr + f">>>>>>>>>>    DIFFERENCES FOR {new_path} ({diffLength} / {cl4diffLength})     <<<<<<<<<<\n\n{cl4diff}\n\n\n"
 
-            import openai
-
-            openai.api_key = "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" #os.environ.get("OPENAI_API_KEY")
-
-            openAIPromt = f"Propose a descriptive changelog entry for: {cl4diff}"
-            print(openAIPromt)
+            openAIPromt = f"Propose a changelog entry in bullets for {cl4diff}"
+            #openAIPromt = f"Propose a descriptive changelog entry for {cl4diff}"
             
-            """
-            response = openai.ChatCompletion.create(
-                engine='text-davinci-003',
-                prompt=openAIPromt,
-                max_tokens=2000,
-                n=1,
-                stop=None,
-                temperature=0.6,
-                frequency_penalty=0.0,
-                presence_penalty=0.0
-            )
-            cl4diffResult = response.choices[0].text
-            """
+            cl4diffResult = ChatGPT_CachedAnswer(openAIPromt)
+            print("ChatGPT Response: " + cl4diffResult)
 
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": openAIPromt}
-                ]
-            )
-            cl4diffResult = response['choices'][0]['message']['content']
-
-            print("ChatGPT Response: " + str(response))
-
-            diffLength = str(len(cl4diff))
-            Changelogstr = Changelogstr + f">>>>>>>>>>    Changelog.md for {new_path} ({diffLength})     <<<<<<<<<<\n\n{cl4diffResult}\n\n\n"
+            Changelogstr = Changelogstr + f"Changes in {new_path}\n{cl4diffResult}\n\n"
 
         return url, MRChangesStr, projectPathWithNamespace.replace("%2F", "/"), projectID, MergeRequestID, Changelogstr
     else:
