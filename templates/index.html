@@ -50,7 +50,7 @@
         <img id="logo" src="{{ url_for('static', filename='ZaBa.jpg') }}" alt="Logo">
     </header>
 
-    <form method="POST" action="/process">
+    <form method="POST" action="/process_mr_url">
         <label class="bold-label" for="mr_url" font-weight: bold>Please enter the merge request URL here, fow which you want to generate a change log proposal:</label><br>
         <input type="text" id="mr_url" name="mr_url" required> <button type="submit">Generate change log proposal</button>
         <br><br>
